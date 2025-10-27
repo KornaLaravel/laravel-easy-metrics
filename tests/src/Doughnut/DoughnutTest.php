@@ -1,5 +1,6 @@
 <?php
 
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Date;
 use SaKanjo\EasyMetrics\Enums\GrowthRateType;
 use SaKanjo\EasyMetrics\Enums\Range;
@@ -157,6 +158,27 @@ it('shows correct data for min method', function () {
         ->min('age', 'gender');
 
     assertEquals($doughnut->getData(), [15, 45]);
+});
+
+it('shows correct data for sum method with date set', function () {
+    $sequence = [
+        ['age' => 20, 'gender' => Gender::Male],
+        ['age' => 15, 'gender' => Gender::Male],
+        ['age' => 60, 'gender' => Gender::Female, 'created_at' => Date::now()->yesterday()],
+        ['age' => 30, 'gender' => Gender::Male],
+        ['age' => 45, 'gender' => Gender::Female],
+        ['age' => 50, 'gender' => Gender::Male],
+    ];
+
+    User::factory()
+        ->forEachSequence(...$sequence)
+        ->create();
+
+    $doughnut = Doughnut::make(User::class)
+        ->date(CarbonImmutable::now()->subDays(1))
+        ->sum('age', 'gender');
+
+    assertEquals($doughnut->getData(), [0, 60]);
 });
 
 // Growth rate
@@ -339,4 +361,36 @@ it('shows correct growth rate for min method', function () {
         ->min('age', 'gender');
 
     assertEquals($doughnut->getGrowthRate(), [-100, -66.67]);
+});
+
+it('shows correct growth rate for sum method with date set', function () {
+    $sequence = [
+        ['age' => 50, 'gender' => Gender::Male, 'created_at' => Date::now()->yesterday()],
+        ['age' => 20, 'gender' => Gender::Male, 'created_at' => Date::now()->subDays(1)],
+        ['age' => 45, 'gender' => Gender::Female, 'created_at' => Date::now()->yesterday()],
+        ['age' => 15, 'gender' => Gender::Female, 'created_at' => Date::now()],
+        ['age' => 60, 'gender' => Gender::Male, 'created_at' => Date::now()->addDays(1)],
+    ];
+
+    User::factory()
+        ->forEachSequence(...$sequence)
+        ->create();
+
+    $doughnut = Doughnut::make(User::class)
+        ->range(Range::TODAY)
+        ->withGrowthRate()
+        ->growthRateType(GrowthRateType::Value)
+        ->date(CarbonImmutable::now()->subDays(1))
+        ->sum('age', 'gender');
+
+    assertEquals($doughnut->getGrowthRate(), [70, 45]);
+
+    $doughnut = Doughnut::make(User::class)
+        ->range(Range::TODAY)
+        ->withGrowthRate()
+        ->growthRateType(GrowthRateType::Percentage)
+        ->date(CarbonImmutable::now()->subDays(1))
+        ->sum('age', 'gender');
+
+    assertEquals($doughnut->getGrowthRate(), [100, 100]);
 });

@@ -5,6 +5,9 @@ namespace SaKanjo\EasyMetrics\Metrics;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Carbon\CarbonPeriod;
+use Illuminate\Support\Arr;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use SaKanjo\EasyMetrics\Concerns\OnlyIntegers;
 use SaKanjo\EasyMetrics\Result;
@@ -21,6 +24,20 @@ class Trend extends Metric
     ];
 
     protected string $unit;
+
+    protected array $groupBy = [];
+
+    public function groupBy(string|array $column): static
+    {
+        $this->groupBy = Arr::wrap($column);
+
+        return $this;
+    }
+
+    protected function getGroupBy(): array
+    {
+        return $this->groupBy;
+    }
 
     public function minByYears(string $column)
     {
@@ -285,17 +302,38 @@ class Trend extends Metric
         $column = $this->query->getQuery()->getGrammar()->wrap($this->column);
         $resultSelectAlias = Str::random();
         $dateResultSelectAlias = Str::random();
+        $groupBy = $this->getGroupBy();
 
         $results = $this->query
             ->withoutEagerLoads()
-            ->selectRaw("$expression as \"$dateResultSelectAlias\", {$this->type}($column) as \"$resultSelectAlias\"")
-            ->whereBetween($dateColumn, [$startingDate, $endingDate])
-            ->groupBy($dateResultSelectAlias)
-            ->get()
-            ->mapWithKeys(fn (mixed $result) => [
-                $result[$dateResultSelectAlias] => $this->transformResult($result[$resultSelectAlias]),
+            ->select([
+                DB::raw("$expression as \"$dateResultSelectAlias\", {$this->type}($column) as \"$resultSelectAlias\""),
+                ...$groupBy,
             ])
-            ->toArray();
+            ->whereBetween($dateColumn, [$startingDate, $endingDate])
+            ->groupBy([$dateResultSelectAlias, ...$groupBy])
+            ->get()
+            ->when($groupBy,
+                fn (Collection $collection): array => $collection
+                    ->reduce(function (array $carry, mixed $result) use ($dateResultSelectAlias, $resultSelectAlias, $groupBy): array {
+                        $date = $result[$dateResultSelectAlias];
+
+                        $carry[$date] ??= [];
+                        $carry[$date][] = [
+                            '__result__' => $this->transformResult($result[$resultSelectAlias]),
+                            ...Arr::mapWithKeys($groupBy, fn (string $group) => [
+                                $group => $result[$group],
+                            ]),
+                        ];
+
+                        return $carry;
+                    }, []),
+                fn (Collection $collection): array => $collection
+                    ->mapWithKeys(fn (mixed $result) => [
+                        $result[$dateResultSelectAlias] => $this->transformResult($result[$resultSelectAlias]),
+                    ])
+                    ->toArray()
+            );
 
         $periods = collect(CarbonPeriod::create($startingDate, "1 {$this->unit}", $endingDate))
             ->mapWithKeys(fn (CarbonInterface $date) => [
@@ -307,9 +345,19 @@ class Trend extends Metric
             ->take(-count($periods))
             ->toArray();
 
+        $currentValue = end($data);
+        $previousValue = prev($data);
+
+        $currentValue = is_array($currentValue)
+            ? array_sum(Arr::pluck($currentValue, '__result__'))
+            : $currentValue;
+        $previousValue = is_array($previousValue)
+            ? array_sum(Arr::pluck($previousValue, '__result__'))
+            : $previousValue;
+
         $growth = count($data) < 2
             ? null
-            : $this->growthRateType->getValue(currentValue: end($data), previousValue: prev($data));
+            : $this->growthRateType->getValue($previousValue, $currentValue);
 
         return Result::make(
             array_values($data),

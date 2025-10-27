@@ -1,5 +1,6 @@
 <?php
 
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Date;
 use SaKanjo\EasyMetrics\Enums\growthRateType;
 use SaKanjo\EasyMetrics\Metrics\Trend;
@@ -710,6 +711,105 @@ it('shows correct data for minByYears method', function () {
     ]);
 });
 
+// date
+
+it('shows correct data for sumByYears method with date set', function () {
+    $sequence = [
+        ['age' => 20, 'gender' => Gender::Female, 'created_at' => Date::now()],
+        ['age' => 30, 'gender' => Gender::Male, 'created_at' => Date::now()->subYears(1)],
+        ['age' => 10, 'gender' => Gender::Male, 'created_at' => Date::now()->subYears(2)],
+        ['age' => 50, 'gender' => Gender::Male, 'created_at' => Date::now()],
+        ['age' => 25, 'gender' => Gender::Female, 'created_at' => Date::now()->subYears(6)],
+        ['age' => 40, 'gender' => Gender::Male, 'created_at' => Date::now()->subYears(7)],
+    ];
+
+    User::factory()
+        ->forEachSequence(...$sequence)
+        ->create();
+
+    $trend = Trend::make(User::class)
+        ->ranges([10])
+        ->date(CarbonImmutable::now()->subDays(2))
+        ->sumByYears('age');
+
+    assertEquals($trend->getData(), [
+        0,
+        0,
+        40,
+        25,
+        0,
+        0,
+        0,
+        10,
+        30,
+        0,
+    ]);
+});
+
+// groupBy
+
+it('shows correct data for sumByYears method with groupBy set', function () {
+    $sequence = [
+        ['age' => 20, 'gender' => Gender::Female, 'created_at' => Date::now()],
+        ['age' => 30, 'gender' => Gender::Male, 'created_at' => Date::now()->subYears(1)],
+        ['age' => 10, 'gender' => Gender::Male, 'created_at' => Date::now()->subYears(2)],
+        ['age' => 50, 'gender' => Gender::Male, 'created_at' => Date::now()],
+        ['age' => 25, 'gender' => Gender::Female, 'created_at' => Date::now()->subYears(6)],
+        ['age' => 40, 'gender' => Gender::Male, 'created_at' => Date::now()->subYears(7)],
+    ];
+
+    User::factory()
+        ->forEachSequence(...$sequence)
+        ->create();
+
+    $trend = Trend::make(User::class)
+        ->ranges([10])
+        ->groupBy('gender')
+        ->sumByYears('age');
+
+    assertEquals($trend->getData(), [
+        0,
+        0,
+        [
+            [
+                '__result__' => 40,
+                'gender' => Gender::Male,
+            ],
+        ],
+        [
+            [
+                '__result__' => 25,
+                'gender' => Gender::Female,
+            ],
+        ],
+        0,
+        0,
+        0,
+        [
+            [
+                '__result__' => 10,
+                'gender' => Gender::Male,
+            ],
+        ],
+        [
+            [
+                '__result__' => 30,
+                'gender' => Gender::Male,
+            ],
+        ],
+        [
+            [
+                '__result__' => 50,
+                'gender' => Gender::Male,
+            ],
+            [
+                '__result__' => 20,
+                'gender' => Gender::Female,
+            ],
+        ],
+    ]);
+});
+
 // Growth rate
 
 it('shows correct growth rate for countByYears method', function () {
@@ -865,4 +965,69 @@ it('shows correct growth rate for minByYears method', function () {
         ->minByYears('age');
 
     assertEquals($trend->getGrowthRate(), -33.33);
+});
+
+it('shows correct growth rate for sumByYears method with date set', function () {
+    $sequence = [
+        ['age' => 20, 'gender' => Gender::Female, 'created_at' => Date::now()],
+        ['age' => 30, 'gender' => Gender::Male, 'created_at' => Date::now()->subYears(1)],
+        ['age' => 10, 'gender' => Gender::Male, 'created_at' => Date::now()->subYears(2)],
+        ['age' => 50, 'gender' => Gender::Male, 'created_at' => Date::now()],
+        ['age' => 25, 'gender' => Gender::Female, 'created_at' => Date::now()->subYears(6)],
+        ['age' => 40, 'gender' => Gender::Male, 'created_at' => Date::now()->subYears(7)],
+    ];
+
+    User::factory()
+        ->forEachSequence(...$sequence)
+        ->create();
+
+    $trend = Trend::make(User::class)
+        ->ranges([10])
+        ->withGrowthRate()
+        ->growthRateType(growthRateType::Value)
+        ->date(CarbonImmutable::now()->subYears(1))
+        ->sumByYears('age');
+
+    assertEquals($trend->getGrowthRate(), 20);
+
+    $trend = Trend::make(User::class)
+        ->ranges([10])
+        ->withGrowthRate()
+        ->growthRateType(growthRateType::Percentage)
+        ->date(CarbonImmutable::now()->subYears(1))
+        ->sumByYears('age');
+
+    assertEquals($trend->getGrowthRate(), 200);
+});
+
+it('shows correct growth rate for sumByYears method with groupBy set', function () {
+    $sequence = [
+        ['age' => 20, 'gender' => Gender::Male, 'created_at' => Date::now()],
+        ['age' => 30, 'gender' => Gender::Male, 'created_at' => Date::now()->subYears(1)],
+        ['age' => 10, 'gender' => Gender::Male, 'created_at' => Date::now()->subYears(2)],
+        ['age' => 50, 'gender' => Gender::Female, 'created_at' => Date::now()],
+        ['age' => 25, 'gender' => Gender::Male, 'created_at' => Date::now()->subYears(6)],
+        ['age' => 40, 'gender' => Gender::Female, 'created_at' => Date::now()->subYears(7)],
+    ];
+
+    User::factory()
+        ->forEachSequence(...$sequence)
+        ->create();
+
+    $trend = Trend::make(User::class)
+        ->ranges([10])
+        ->withGrowthRate()
+        ->growthRateType(growthRateType::Value)
+        ->groupBy('gender')
+        ->sumByYears('age');
+
+    assertEquals($trend->getGrowthRate(), 40);
+
+    $trend = Trend::make(User::class)
+        ->ranges([10])
+        ->withGrowthRate()
+        ->growthRateType(growthRateType::Percentage)
+        ->sumByYears('age');
+
+    assertEquals($trend->getGrowthRate(), 133.33);
 });

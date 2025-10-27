@@ -13,59 +13,55 @@ enum Range: string
     case YTD = 'YTD';
     case ALL = 'ALL';
 
-    public function getPreviousRange(): ?array
+    public function getPreviousRange(CarbonImmutable $date): ?array
     {
-        $now = CarbonImmutable::now();
-
         return match ($this) {
             Range::TODAY => [
-                $now->subDay()->startOfDay(),
-                $now->subDay(),
+                $date->subDay()->startOfDay(),
+                $date->subDay(),
             ],
             Range::YESTERDAY => [
-                $now->subDays(2)->startOfDay(),
-                $now->subDays(2),
+                $date->subDays(2)->startOfDay(),
+                $date->subDays(2),
             ],
             Range::MTD => [
-                $now->subMonthWithoutOverflow()->startOfMonth(),
-                $now->subMonthWithoutOverflow(),
+                $date->subMonthWithoutOverflow()->startOfMonth(),
+                $date->subMonthWithoutOverflow(),
             ],
             Range::QTD => [
-                $now->subQuarter()->startOfQuarter(),
-                $now->subQuarter(),
+                $date->subQuarter()->startOfQuarter(),
+                $date->subQuarter(),
             ],
             Range::YTD => [
-                $now->subYear()->startOfYear(),
-                $now->subYear(),
+                $date->subYear()->startOfYear(),
+                $date->subYear(),
             ],
             Range::ALL => null,
         };
     }
 
-    public function getRange(): ?array
+    public function getRange(CarbonImmutable $date): ?array
     {
-        $now = CarbonImmutable::now();
-
         return match ($this) {
             Range::TODAY => [
-                $now->startOfDay(),
-                $now,
+                $date->startOfDay(),
+                $date,
             ],
             Range::YESTERDAY => [
-                $now->subDay()->startOfDay(),
-                $now->subDay(),
+                $date->subDay()->startOfDay(),
+                $date->subDay(),
             ],
             Range::MTD => [
-                $now->startOfMonth(),
-                $now,
+                $date->startOfMonth(),
+                $date,
             ],
             Range::QTD => [
-                $now->startOfQuarter(),
-                $now,
+                $date->startOfQuarter(),
+                $date,
             ],
             Range::YTD => [
-                $now->startOfYear(),
-                $now,
+                $date->startOfYear(),
+                $date,
             ],
             Range::ALL => null,
         };

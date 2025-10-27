@@ -5,7 +5,6 @@ namespace SaKanjo\EasyMetrics\Metrics;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Carbon\CarbonPeriod;
-use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Str;
 use SaKanjo\EasyMetrics\Concerns\OnlyIntegers;
 use SaKanjo\EasyMetrics\Result;
@@ -249,28 +248,28 @@ class Trend extends Metric
 
     protected function getStartingDate(): CarbonImmutable
     {
-        $now = CarbonImmutable::now();
+        $date = $this->getDate();
         $range = $this->getRange() - 1;
 
         return match ($this->unit) {
-            'year' => $now
+            'year' => $date
                 ->subYearsWithoutOverflow($range)
                 ->firstOfYear()
                 ->setTime(0, 0),
-            'month' => $now
+            'month' => $date
                 ->subMonthsWithoutOverflow($range)
                 ->firstOfMonth()
                 ->setTime(0, 0),
-            'week' => $now
+            'week' => $date
                 ->subWeeks($range)
                 ->startOfWeek()
                 ->setTime(0, 0),
-            'day' => $now
+            'day' => $date
                 ->subDays($range)
                 ->setTime(0, 0),
-            'hour' => $now
+            'hour' => $date
                 ->subHours($range),
-            'minute' => $now
+            'minute' => $date
                 ->subMinutes($range),
             default => throw new \InvalidArgumentException("Invalid unit: {$this->unit}"),
         };
@@ -280,7 +279,7 @@ class Trend extends Metric
     {
         $dateColumn = $this->getDateColumn();
         $startingDate = $this->getStartingDate();
-        $endingDate = Date::now();
+        $endingDate = $this->getDate();
 
         $expression = $this->getExpression();
         $column = $this->query->getQuery()->getGrammar()->wrap($this->column);
@@ -289,7 +288,7 @@ class Trend extends Metric
 
         $results = $this->query
             ->withoutEagerLoads()
-            ->selectRaw("{$expression} as \"$dateResultSelectAlias\", {$this->type}($column) as \"$resultSelectAlias\"")
+            ->selectRaw("$expression as \"$dateResultSelectAlias\", {$this->type}($column) as \"$resultSelectAlias\"")
             ->whereBetween($dateColumn, [$startingDate, $endingDate])
             ->groupBy($dateResultSelectAlias)
             ->get()

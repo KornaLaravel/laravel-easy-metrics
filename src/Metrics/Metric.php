@@ -2,10 +2,10 @@
 
 namespace SaKanjo\EasyMetrics\Metrics;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\App;
-use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Traits\Conditionable;
 use Illuminate\Support\Traits\Macroable;
 use SaKanjo\EasyMetrics\Enums\GrowthRateType;
@@ -25,6 +25,8 @@ abstract class Metric
     protected int|Range|null $range = null;
 
     protected bool $withGrowthRate = false;
+
+    protected ?CarbonImmutable $date = null;
 
     protected ?string $dateColumn = null;
 
@@ -125,6 +127,18 @@ abstract class Metric
         return $this->dateColumn ?? $this->query->getModel()->getCreatedAtColumn();
     }
 
+    public function date(?CarbonImmutable $date): static
+    {
+        $this->date = $date;
+
+        return $this;
+    }
+
+    protected function getDate(): ?CarbonImmutable
+    {
+        return $this->date ?? CarbonImmutable::now();
+    }
+
     protected function resolveBetween(array $range): array
     {
         return [
@@ -136,28 +150,30 @@ abstract class Metric
     protected function previousRange(): ?array
     {
         $range = $this->getRange();
+        $date = $this->getDate();
 
         if ($range instanceof Range) {
-            return $range->getPreviousRange();
+            return $range->getPreviousRange($date);
         }
 
         return [
-            Date::now()->subDays($range * 2),
-            Date::now()->subDays($range),
+            $date->subDays($range * 2),
+            $date->subDays($range),
         ];
     }
 
     protected function currentRange(): ?array
     {
         $range = $this->getRange();
+        $date = $this->getDate();
 
         if ($range instanceof Range) {
-            return $range->getRange();
+            return $range->getRange($date);
         }
 
         return [
-            Date::now()->subDays($range),
-            Date::now(),
+            $date->subDays($range),
+            $date,
         ];
     }
 
